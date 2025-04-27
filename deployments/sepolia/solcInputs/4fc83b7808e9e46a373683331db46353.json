@@ -1,0 +1,44 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts/AggregatorV3Interface.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\n// solhint-disable-next-line interface-starts-with-i\ninterface AggregatorV3Interface {\n    function decimals() external view returns (uint8);\n\n    function description() external view returns (string memory);\n\n    function version() external view returns (uint256);\n\n    function getRoundData(\n        uint80 _roundId\n    )\n        external\n        view\n        returns (\n            uint80 roundId,\n            int256 answer,\n            uint256 startedAt,\n            uint256 updatedAt,\n            uint80 answeredInRound\n        );\n\n    function latestRoundData()\n        external\n        view\n        returns (\n            uint80 roundId,\n            int256 answer,\n            uint256 startedAt,\n            uint256 updatedAt,\n            uint80 answeredInRound\n        );\n}\n"
+    },
+    "contracts/FundMe.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.8;\n\nimport \"./PriceCalculator.sol\";\n\ncontract FundMe {\n    //ETHUSD price address for sepolia testnet 0x694AA1769357215DE4FAC081bf1f309aDC325306\n    using PriceCalculator for uint256;\n\n    uint256 public constant minUSD = 1 * 1e18;\n\n    AggregatorV3Interface public priceFeed;\n\n    address[] public funder;\n    mapping(address => uint256) public funderAddrArray;\n\n    address public immutable i_owner;\n\n    error notOwner();\n    error NoFund();\n\n    constructor(address priceFeedAddress) {\n        i_owner = msg.sender;\n        priceFeed = AggregatorV3Interface(priceFeedAddress);\n    }\n\n    function Fund() public payable {\n        if (msg.value.PriceCal(priceFeed) >= minUSD) revert NoFund();\n        //require(msg.value.PriceCal() >= minUSD, \"No funds\");\n\n        funder.push(msg.sender);\n        funderAddrArray[msg.sender] += msg.value;\n    }\n\n    function Withdraw() public onlyOwnwer {\n        for (uint256 i = 0; i < funder.length; i++) {\n            address funders = funder[i];\n            // to reset array value number or length\n            funderAddrArray[funders] = 0;\n        }\n        //to reset the array\n        funder = new address[](0);\n\n        (bool success, ) = payable(msg.sender).call{\n            value: address(this).balance\n        }(\"\");\n\n        require(success, \"Transfer failed\");\n    }\n\n    modifier onlyOwnwer() {\n        if (msg.sender != i_owner) revert notOwner();\n        //require(msg.sender == owner, \"Sender is not Owner\");\n        _;\n    }\n\n    receive() external payable {\n        Fund();\n    }\n\n    fallback() external payable {\n        Fund();\n    }\n}\n"
+    },
+    "contracts/PriceCalculator.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.8;\n\nimport \"./AggregatorV3Interface.sol\";\n\nlibrary PriceCalculator {\n    function getPrice(\n        AggregatorV3Interface priceFeed\n    ) internal view returns (uint256) {\n        // AggregatorV3Interface priceFeed = AggregatorV3Interface(\n        //     0x694AA1769357215DE4FAC081bf1f309aDC325306\n        // );\n        (uint256 price, , , , ) = priceFeed.latestRoundData();\n        return price;\n    }\n\n    function PriceCal(\n        uint ETH_Amount,\n        AggregatorV3Interface priceFeed\n    ) internal view returns (uint256) {\n        uint256 ethPrice = ETH_Amount * 1e18;\n\n        return (getPrice(priceFeed) * ethPrice) / 1e18;\n    }\n}\n"
+    },
+    "contracts/tests/MockV3Aggregator.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"../AggregatorV3Interface.sol\";\n\n// Deploying with typical ETH/USD mock values\n// MockAggregatorV3 mockFeed = new MockAggregatorV3(\n//     8,               // decimals (Chainlink ETH/USD uses 8)\n//     \"ETH/USD\",       // description\n//     1,               // version\n//     2000 * 10 ** 8   // initialAnswer (e.g. $2,000.00)\n// );\n\n// Mock implementation\ncontract MockAggregatorV3 is AggregatorV3Interface {\n    uint8 private _decimals;\n    string private _description;\n    uint256 private _version;\n\n    int256 private _answer;\n    uint80 private _roundId;\n    uint256 private _updatedAt;\n\n    constructor(\n        uint8 decimals_,\n        string memory description_,\n        uint256 version_,\n        int256 initialAnswer_\n    ) {\n        _decimals = decimals_;\n        _description = description_;\n        _version = version_;\n        _answer = initialAnswer_;\n        _roundId = 1;\n        _updatedAt = block.timestamp;\n    }\n\n    function decimals() external view override returns (uint8) {\n        return _decimals;\n    }\n\n    function description() external view override returns (string memory) {\n        return _description;\n    }\n\n    function version() external view override returns (uint256) {\n        return _version;\n    }\n\n    function getRoundData(\n        uint80 _queryRoundId\n    )\n        external\n        view\n        override\n        returns (\n            uint80 roundId,\n            int256 answer,\n            uint256 startedAt,\n            uint256 updatedAt,\n            uint80 answeredInRound\n        )\n    {\n        require(_queryRoundId == _roundId, \"No data for that round\");\n        return (_roundId, _answer, _updatedAt, _updatedAt, _roundId);\n    }\n\n    function latestRoundData()\n        external\n        view\n        override\n        returns (\n            uint80 roundId,\n            int256 answer,\n            uint256 startedAt,\n            uint256 updatedAt,\n            uint80 answeredInRound\n        )\n    {\n        return (_roundId, _answer, _updatedAt, _updatedAt, _roundId);\n    }\n\n    // Helper to update the mock answer\n    function updateAnswer(int256 newAnswer) external {\n        _answer = newAnswer;\n        _updatedAt = block.timestamp;\n        _roundId += 1;\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
