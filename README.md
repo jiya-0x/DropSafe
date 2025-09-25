@@ -87,7 +87,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 👤 Author
 
-- Name: Jiya Swalihu Etsugaie
+- Name: Jiya Etsugaie
 - Security Contact: jiya_0xdao@outlook.com
 - GitHub: Jiya (https://github.com/jiya-0x)
 
